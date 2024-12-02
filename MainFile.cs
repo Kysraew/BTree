@@ -40,10 +40,10 @@ namespace BTree
             _buffor = new byte[_pageSize];
             _loadedPageNumber = 0;
 
+            fileSystem = new FileSystem(filePath+".mf", creatingMode);
+            
             if (creatingMode == CreatingMode.Create)
             {
-                fileSystem = new FileSystem(filePath, creatingMode);
-
                 _metaData = new MetaData();
                 _metaData.areEmptySpaces = false;
                 _metaData.numberOfEmptySpaces = 0;
@@ -54,12 +54,9 @@ namespace BTree
             }
             else
             {
-                fileSystem = new FileSystem(filePath, creatingMode);
-
                 _buffor = fileSystem.LoadPage(0);
 
                 _metaData = CastingHelper.CastToStruct<MetaData>(_buffor);
-
             }
 
         }

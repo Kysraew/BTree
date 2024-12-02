@@ -10,6 +10,5 @@ namespace BTree
     {
         public const long PageSize = 600;
         public const long RecordLength = 30;
-        public const long RecordLength = 30;
     }
 }
