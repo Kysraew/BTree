@@ -7,9 +7,13 @@ namespace BTree
         static void Main(string[] args)
         {
 
-            MainTape TestMainTape = new MainTape("test.bin", true);
+            BTree BTree1 = new BTree("btreeTest1", CreatingMode.Create);
 
+            BTree1.AddRandomRecords(27);
 
+            BTree1.PrintAllInfo();
+
+            BTree1.AddRecord(27, new char[] {'a' });
 
 
 

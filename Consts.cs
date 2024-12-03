@@ -10,5 +10,7 @@ namespace BTree
     {
         public const long PageSize = 600;
         public const long RecordLength = 30;
+        public const char MaxCharValue = (char)120;
+        public const  char MinCharValue = (char)40;
     }
 }

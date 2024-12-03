@@ -58,6 +58,7 @@ namespace BTree
 
                 //We create buffers
                 _nodesBuffers = new List<Node?>();
+                
                 _nodesBuffers.Add(AddNewNode());
 
                 _metaData.rootNodePage = _nodesBuffers[0].pageNumber;
@@ -122,14 +123,10 @@ namespace BTree
             return true;
         }
 
-        //private long LoadNodeByKey() // return height Node will be loaded to the _nodesBuffers[height]
-        //{
-
-        //}
 
         public bool AddRecord(long key, char[] record)
         {
-            if (record.Length != Consts.RecordLength)
+            if (record.Length >= Consts.RecordLength) // We have to leave place for '\0'
             {
                 throw new ArgumentException("Record length is diffrent!");
             }
@@ -167,14 +164,17 @@ namespace BTree
             return true;
         }
 
-        
+        private UpdateParentsReferences(long pageAddress, long height)
+        {
+
+        }
 
         private bool SplitNode(long splitingPageNumber, long key, long mainFileAddress, long height, long? newRightSplittedNodePageNumber = null)
         {
             LoadPageToNodesBuffer(splitingPageNumber, height);
 
             Node NewNode = AddNewNode();
-            (long parentNodeNewKey, long parentNodeNewMainFileAddress) = _nodesBuffers[(int)height].SplitWith(NewNode, key, mainFileAddress, newRightSplittedNodePageNumber); // NewNode is right part
+            (long parentNodeNewKey, long parentNodeNewMainFileAddress) = _nodesBuffers[(int)height].AddedSplitWith(NewNode, key, mainFileAddress, newRightSplittedNodePageNumber); // NewNode is right part
 
             PersistNode(NewNode);
 
@@ -193,6 +193,9 @@ namespace BTree
                 _nodesBuffers[(int)height].SetParentAddress(NewRootNode.pageNumber);
 
                 _metaData.rootNodePage = NewRootNode.pageNumber;
+
+                _metaData.height++;
+                _nodesBuffers.Add(null);
 
                 return true;
             }
@@ -260,7 +263,7 @@ namespace BTree
                     {
                         (long newRightParentKey, long newRightParentMainFileAddress) = AddingNode.EqualizedElementAddingWithRightSibling(RightSiblingNode, rightParentKey, rightParentMainFileAddress, nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
 
-                        _nodesBuffers[(int)height - 1].SetLeftKeyAddressPairToChild(AddingNode.pageNumber, newRightParentKey, newRightParentMainFileAddress);
+                        _nodesBuffers[(int)height - 1].SetRightKeyAddressPairToChild(AddingNode.pageNumber, newRightParentKey, newRightParentMainFileAddress);
 
                         PersistNode(RightSiblingNode);
 
@@ -309,15 +312,80 @@ namespace BTree
 
         private Node AddNewNode()
         {
+
             if (_metaData.areEmptySpaces)
             {
+                byte[] pageWithFreeAddresses = _fileSystem.LoadPage(_metaData.numberOfPages - 1);
+                int addressBufferIndex = (int)(((_metaData.numberOfEmptySpaces - 1) * sizeof(long)) % Consts.PageSize);
 
+                long pageAddress = BitConverter.ToInt64(pageWithFreeAddresses, addressBufferIndex);
+
+                if (addressBufferIndex == 0)
+                {
+                    _fileSystem.DeleteLastPage();
+                    _metaData.numberOfPages--;
+                }
+                _metaData.numberOfEmptySpaces--;
+                _metaData.areEmptySpaces = (_metaData.numberOfEmptySpaces > 0) ? true : false;
+
+                return new Node(new byte[Consts.PageSize], pageAddress, this);
             }
             else
             {
-
+                _fileSystem.AddPage();
+                return new Node(new byte[Consts.PageSize], _metaData.numberOfPages++, this);
             }
-            throw new NotImplementedException();
+        }
+
+
+        public void PrintAllRecords()
+        {
+            PrintAllRecordsFrom(_metaData.rootNodePage, 0);
+        }
+
+        public void PrintAllInfo()
+        {
+            PrintAllInfoFrom(_metaData.rootNodePage, 0);
+        }
+
+        public void PrintAllRecordsFrom(long dataPageNumber, long height)
+        {
+            LoadPageToNodesBuffer(dataPageNumber, height);
+
+
+            for (int i = 0; i < _nodesBuffers[(int)height].NumberOfElements; i++)
+            {
+                if (height < _metaData.height) // means that it is leaf
+                {
+                    PrintAllRecordsFrom(_nodesBuffers[(int)height].GetChildAddress(i), height + 1);
+                }
+                Console.WriteLine($"K: {_nodesBuffers[(int)height].GetKey(i)} V: {new string(_mainFile.GetRecord(_nodesBuffers[(int)height].GetRecordAddress(i)))}");
+            }
+            if (height < _metaData.height) // means that it is leaf
+            {
+                PrintAllRecordsFrom(_nodesBuffers[(int)height].GetChildAddress((int)_nodesBuffers[(int)height].NumberOfElements), height + 1);
+            }
+        }
+
+        public void PrintAllInfoFrom(long dataPageNumber, long height)
+        {
+            LoadPageToNodesBuffer(dataPageNumber, height);
+
+            for (int i = 0; i < _nodesBuffers[(int)height].NumberOfElements; i++)
+            {
+                if (height < _metaData.height) // means that it is leaf
+                {
+                    PrintAllInfoFrom(_nodesBuffers[(int)height].GetChildAddress(i), height + 1);
+                    Console.WriteLine($"{new string('\t', (int)height * 4 + 1)} /--P:{_nodesBuffers[(int)height].GetChildAddress(i)}---");
+                }
+                Console.WriteLine($"{new string('\t', (int)height * 4)}[K: {_nodesBuffers[(int)height].GetKey(i)}]"); //V: { new string(_mainFile.GetRecord(_nodesBuffers[(int)height].GetRecordAddress(i)))}
+            }
+
+            if (height < _metaData.height) // means that it is leaf
+            {
+                Console.WriteLine($"{new string('\t', (int)height * 4 + 1)} \\--P:{_nodesBuffers[(int)height].GetChildAddress((int)_nodesBuffers[(int)height].NumberOfElements)}---");
+                PrintAllInfoFrom(_nodesBuffers[(int)height].GetChildAddress((int)_nodesBuffers[(int)height].NumberOfElements), height + 1);
+            }
         }
 
         private bool DeleteNode(Node node)
