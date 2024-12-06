@@ -39,29 +39,43 @@ namespace BTree
         public static void AddRandomRecords(this BTree bTree, int numberOfRandomRecords)
         {
             Random random = new Random();
-            //for (int i = 0; i < numberOfRandomRecords; i++) 
-            //{
-            //    bTree.AddRecord(random.NextInt64(), GenerateRecord(random.Next(1,(int)(Consts.RecordLength - 1))));
-            //}
-            //bTree.AddRecord(1, GenerateRecord(random.Next(1,(int)(Consts.RecordLength - 1))));
-            //bTree.AddRecord(2, GenerateRecord(random.Next(1,(int)(Consts.RecordLength - 1))));
-            //bTree.AddRecord(3, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            for (int i = 0; i < numberOfRandomRecords; i++)
+            {
+                bTree.AddRecord(random.NextInt64(1, 100), GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+                //bTree.PrintAllInfo();
+                //Console.WriteLine("\n\n\n\n");
+            }
+            //bTree.AddRecord(1, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(79, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(92, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(13, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+
+            //bTree.AddRecord(89, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(4, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(41, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+
 
             //bTree.AddRecord(5, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
-            //bTree.AddRecord(6, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
-            //bTree.AddRecord(7, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
-            //bTree.AddRecord(8, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
 
-            //bTree.AddRecord(9, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(25, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(10, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(11, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(12, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
 
-            for(int i = 0; i < numberOfRandomRecords; i++)
-            {
-                bTree.AddRecord(i, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
-            }
+            //bTree.AddRecord(8, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(163, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(7, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(5, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+
+            //bTree.AddRecord(142, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(10, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(11, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //bTree.AddRecord(12, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+
+            //for(int i = 0; i < numberOfRandomRecords; i++)
+            //{
+            //    bTree.AddRecord(i, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
+            //}
 
 
         }

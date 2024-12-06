@@ -180,19 +180,19 @@ namespace BTree
             {
                 if (GetChildAddress(i + 1) == pageNumber)
                 {
-                    return (GetKey(i), GetChildAddress(i));
+                    return (GetKey(i), GetRecordAddress(i));
                 }
             }
             throw new Exception("This page don't have left values to this page");
         }
 
-        internal (long rightParentKey, long rightParentMainFileAddress) GetRightKeyAddressPairToChild(long pageNumber)
+        internal (long rightParentKey, long rightParentMainFileAddres) GetRightKeyAddressPairToChild(long pageNumber)
         {
             for (int i = 0; i < NumberOfElements; i++)
             {
                 if (GetChildAddress(i) == pageNumber)
                 {
-                    return (GetKey(i + 1), GetRecordAddress(i + 1));
+                    return (GetKey(i), GetRecordAddress(i));
                 }
             }
             throw new Exception("This page don't have right values to this page");
@@ -230,7 +230,7 @@ namespace BTree
             leftSiblingNode.SetRecordAddress((int)leftSiblingNode.NumberOfElements, leftParentMainFileAddress);
             
             // We move records form right node to left node
-            Array.Copy(this.nodeBytes, 2 * sizeof(long), leftSiblingNode.nodeBytes, 2 * sizeof(long) + (NumberOfElements+1)*3*sizeof(long), 3 * sizeof(long) * ((this.NumberOfElements + 1) - numberOfMovedRecords) + sizeof(long)); // We also have to move the most right child pointer
+            Array.Copy(this.nodeBytes, 2 * sizeof(long), leftSiblingNode.nodeBytes, 2 * sizeof(long) + (leftSiblingNode.NumberOfElements+1)*3*sizeof(long), 3 * sizeof(long) * (numberOfMovedRecords - 1) + sizeof(long)); // We also have to move the most right child pointer
 
 
             //We shift to left right node
@@ -289,11 +289,11 @@ namespace BTree
             Array.Copy(rightSiblingNode.nodeBytes, 2 * sizeof(long), rightSiblingNode.nodeBytes, 2 * sizeof(long) + 3 * numberOfMovedRecords * sizeof(long), 3 * sizeof(long) * (this.NumberOfElements + 1)); // We also have to move the most right child pointer
 
             //We move parent record to the right node
-            rightSiblingNode.SetKey(numberOfMovedRecords - 1, rightParentKey);
-            rightSiblingNode.SetRecordAddress(numberOfMovedRecords - 1, rightParentMainFileAddress);
+            rightSiblingNode.SetKey(0, rightParentKey);
+            rightSiblingNode.SetRecordAddress(0, rightParentMainFileAddress);
 
             // We move records form left node to right node
-            Array.Copy(this.nodeBytes, 2 * sizeof(long) + 3 * sizeof(long) * (newLeftNodeNumberOfElements + 1), rightSiblingNode.nodeBytes, 2 * sizeof(long),  3 * sizeof(long) * ((this.NumberOfElements + 1) - numberOfMovedRecords) + sizeof(long)); // We also have to move the most right child pointer
+            Array.Copy(this.nodeBytes, 2 * sizeof(long) + 3 * sizeof(long) * (newLeftNodeNumberOfElements + 1), rightSiblingNode.nodeBytes, 2 * sizeof(long),  3 * sizeof(long) * (numberOfMovedRecords - 1) + sizeof(long)); // We also have to move the most right child pointer
 
             this.NumberOfElements = newLeftNodeNumberOfElements;
             rightSiblingNode.NumberOfElements = newRightNodeNumberOfElements;
