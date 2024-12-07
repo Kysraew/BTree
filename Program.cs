@@ -34,12 +34,23 @@ namespace BTree
         }
         static void Main(string[] args)
         {
-            Random random = new Random();
+            CommandReader reader = new CommandReader();
+
+            Console.WriteLine("Command line for BTree:\n");
+
+            Console.Write(">");
+            string? inputLine  = Console.ReadLine();
+            while (inputLine != null && inputLine != string.Empty)
+            {
+                reader.ReadCommand(inputLine);
+                Console.Write(">");
+                inputLine = Console.ReadLine();
+            }
 
 
-            BTree bTree = new BTree("btreeTest1", CreatingMode.Create);
-
-            bTree.AddRandomRecords(30);
+            //Random random = new Random();
+            //BTree bTree = new BTree("btreeTest1", CreatingMode.Create);
+            //bTree.AddRandomRecords(30);
 
             //bTree.AddRecord(1, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(79, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
@@ -49,12 +60,14 @@ namespace BTree
             //bTree.AddRecord(89, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(4, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(41, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
-            //bTree.PrintAllInfo();
-
             //bTree.AddRecord(51, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
 
-            //BTree1.AddRecord(27, new char[] {'a' });
+            //bTree.PrintAllInfo();
 
+            //bTree.DeleteRecord(51);
+
+            //bTree.PrintAllInfo();
+            //Console.WriteLine("\n\n\n\n");
 
             //bTree.AddRecord(26, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
             //bTree.AddRecord(3, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
@@ -72,7 +85,6 @@ namespace BTree
             //bTree.AddRecord(12, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
 
 
-
             //bTree.AddRecord(8, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
 
             //bTree.PrintAllInfo();
@@ -88,7 +100,7 @@ namespace BTree
             //bTree.AddRecord(142, GenerateRecord(random.Next(1, (int)(Consts.RecordLength - 1))));
 
 
-            bTree.PrintAllInfo();
+            //bTree.PrintAllInfo();
 
 
         }

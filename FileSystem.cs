@@ -104,5 +104,10 @@ namespace BTree
 
             return true;
         }
+
+        public void EndConnection()
+        {
+            _fileStream.Close();
+        }
     }
 }

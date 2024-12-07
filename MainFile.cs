@@ -72,6 +72,7 @@ namespace BTree
             metaDataBytes.CopyTo(_buffor, 0);
 
             fileSystem.SavePage(0, _buffor);
+            fileSystem.EndConnection();
         }
 
         public void ReconnectToTape()
@@ -131,7 +132,7 @@ namespace BTree
 
             _metaData.areEmptySpaces = true;
             _metaData.numberOfEmptySpaces++;
-            _metaData.fileLengh += sizeof(byte);
+            _metaData.fileLengh += sizeof(long);
 
             return true;
         }

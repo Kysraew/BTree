@@ -82,9 +82,17 @@ namespace BTree
             BitConverter.GetBytes(childAddressValue).CopyTo(nodeBytes, sizeof(long) * 2 + 3 * childIndex * sizeof(long));
         }
 
-        public long GetChildPageAddressForKey(long key)
+        public long GetRecordAddressForKey(long key)
         {
-            throw new NotImplementedException();
+            for (int i = 0; i < NumberOfElements; i++)
+            {
+                if (GetKey(i) == key)
+                {
+                    return GetRecordAddress(i);
+                }
+            }
+
+            throw new Exception();
         }
 
         public bool AddElement(long key, long nodeMainFileAddress, long? newRightSplittedPageNumber = null)
@@ -111,8 +119,22 @@ namespace BTree
         }
         public bool DeleteElement(long key)
         {
-            throw new NotImplementedException();
+            int recordIndex = -1;
+            for (int i = 0; i < NumberOfElements; i++)
+            {
+                if (GetKey(i) == key)
+                {
+                    recordIndex = i;
+                    break;
+                }
+            }
+            if (recordIndex == -1)
+                return false;
 
+            Array.Copy(nodeBytes, 2 * sizeof(long) + 3 * sizeof(long) * (recordIndex + 1), nodeBytes, 2 * sizeof(long) + 3 * sizeof(long) * recordIndex, 3 * sizeof(long) * (NumberOfElements - (recordIndex +1)) + sizeof(long)); // We also have to move the most right child pointer
+
+            NumberOfElements--;
+            return true;
         }
 
         public bool IsLeaf()
@@ -210,34 +232,67 @@ namespace BTree
             return (int)NumberOfElements;
         }
 
-        internal (long newLeftParentKey, long newLeftParentMainFileAddress) EqualizedElementAddingWithLeftSibling(Node leftSiblingNode, long leftParentKey, long leftParentMainFileAddress, long key, long nodeMainFileAddress, long? newRightSplittedPageNumber)
+        internal (long newLeftParentKey, long newLeftParentMainFileAddress) EqualizedWithSibling(Node leftSiblingNode, long parentKey, long parentMainFileAddress)
         {
-            this.AddElement(key, nodeMainFileAddress, newRightSplittedPageNumber);
+            Node greaterNode;
+            Node smallerNode;
+            if (leftSiblingNode.GetKey(0) > this.GetKey(0))
+            {
+                greaterNode = leftSiblingNode;
+                smallerNode = this;
+            }
+            else
+            {
+                greaterNode = this;
+                smallerNode = leftSiblingNode;
+            }
 
-            long numberOfElementsOnTwoNodes = this.NumberOfElements + leftSiblingNode.NumberOfElements;
-            long newRightNodeNumberOfElements = numberOfElementsOnTwoNodes / 2;
-            long newLeftNodeNumberOfElements = numberOfElementsOnTwoNodes - newRightNodeNumberOfElements;
+            long numberOfElementsOnTwoNodes = greaterNode.NumberOfElements + smallerNode.NumberOfElements;
+            long newGreaterNodeNumberOfElements = numberOfElementsOnTwoNodes / 2;
+            long newSmallerNodeNumberOfElements = numberOfElementsOnTwoNodes - newGreaterNodeNumberOfElements;
+            int numberOfMovedToGreater = (int)(newGreaterNodeNumberOfElements - greaterNode.NumberOfElements);
+            int numberOfMovedToSmaller = (int)(newSmallerNodeNumberOfElements - smallerNode.NumberOfElements);
 
-            int numberOfMovedRecords = (int)(this.NumberOfElements - newRightNodeNumberOfElements);
+            long newParentKey;
+            long newParentMainFileAddress;
 
-            long newParentKey = this.GetKey((int)numberOfMovedRecords - 1);
-            long newParentMainFileAddress = this.GetRecordAddress((int)numberOfMovedRecords - 1);
+            if (numberOfMovedToGreater == 0)
+            {
+                return (parentKey, parentMainFileAddress);
+            }
+            else if (numberOfMovedToGreater > 0)
+            {
+                newParentKey = smallerNode.GetKey((int)newSmallerNodeNumberOfElements);
+                newParentMainFileAddress = smallerNode.GetRecordAddress((int)newSmallerNodeNumberOfElements);
 
+                //We make space for moved records
+                Array.Copy(greaterNode.nodeBytes, 2 * sizeof(long), greaterNode.nodeBytes, 2 * sizeof(long) + 3 * numberOfMovedToGreater * sizeof(long), 3 * sizeof(long) * (greaterNode.NumberOfElements + 1)); // We also have to move the most right child pointer
 
+                //We move parent record to the right node
+                greaterNode.SetKey(0, parentKey);
+                greaterNode.SetRecordAddress(0, parentMainFileAddress);
 
-            //We move parent record to the right node
-            leftSiblingNode.SetKey((int)leftSiblingNode.NumberOfElements, leftParentKey);
-            leftSiblingNode.SetRecordAddress((int)leftSiblingNode.NumberOfElements, leftParentMainFileAddress);
-            
-            // We move records form right node to left node
-            Array.Copy(this.nodeBytes, 2 * sizeof(long), leftSiblingNode.nodeBytes, 2 * sizeof(long) + (leftSiblingNode.NumberOfElements+1)*3*sizeof(long), 3 * sizeof(long) * (numberOfMovedRecords - 1) + sizeof(long)); // We also have to move the most right child pointer
+                // We move records form left node to right node
+                Array.Copy(smallerNode.nodeBytes, 2 * sizeof(long) + 3 * sizeof(long) * (newSmallerNodeNumberOfElements + 1), greaterNode.nodeBytes, 2 * sizeof(long), 3 * sizeof(long) * (numberOfMovedToGreater - 1) + sizeof(long)); // We also have to move the most right child pointer
+            }
+            else
+            {
+                newParentKey = greaterNode.GetKey((int)numberOfMovedToSmaller - 1);
+                newParentMainFileAddress = greaterNode.GetRecordAddress((int)numberOfMovedToSmaller - 1);
 
+                //We move parent record to the smaller node
+                smallerNode.SetKey((int)smallerNode.NumberOfElements, parentKey);
+                smallerNode.SetRecordAddress((int)smallerNode.NumberOfElements, parentMainFileAddress);
 
-            //We shift to left right node
-            Array.Copy(this.nodeBytes, 2 * sizeof(long) + numberOfMovedRecords*3*sizeof(long), this.nodeBytes, 2 * sizeof(long), 3 * sizeof(long) * (newRightNodeNumberOfElements + 1)); // We also have to move the most right child pointer
+                // We move records form right node to left node
+                Array.Copy(greaterNode.nodeBytes, 2 * sizeof(long), smallerNode.nodeBytes, 2 * sizeof(long) + (smallerNode.NumberOfElements + 1) * 3 * sizeof(long), 3 * sizeof(long) * (numberOfMovedToSmaller - 1) + sizeof(long)); // We also have to move the most right child pointer
 
-            this.NumberOfElements = newRightNodeNumberOfElements;
-            leftSiblingNode.NumberOfElements = newLeftNodeNumberOfElements;
+                //We shift to left right node
+                Array.Copy(this.nodeBytes, 2 * sizeof(long) + numberOfMovedToSmaller * 3 * sizeof(long), this.nodeBytes, 2 * sizeof(long), 3 * sizeof(long) * (newGreaterNodeNumberOfElements + 1)); // We also have to move the most right child pointer
+            }
+
+            smallerNode.NumberOfElements = newSmallerNodeNumberOfElements;
+            greaterNode.NumberOfElements = newGreaterNodeNumberOfElements;
 
             return (newParentKey, newParentMainFileAddress);
         }
@@ -271,11 +326,8 @@ namespace BTree
 
 
 
-        internal (long newRightParentKey, long newRightParentMainFileAddress) EqualizedElementAddingWithRightSibling(Node rightSiblingNode, long rightParentKey, long rightParentMainFileAddress, long key, long nodeMainFileAddress, long? newRightSplittedPageNumber)
+        internal (long newRightParentKey, long newRightParentMainFileAddress) EqualizedElementAddingWithRightSibling(Node rightSiblingNode, long rightParentKey, long rightParentMainFileAddress)
         {
-
-            this.AddElement(key, nodeMainFileAddress, newRightSplittedPageNumber);
-
             long numberOfElementsOnTwoNodes = this.NumberOfElements + rightSiblingNode.NumberOfElements;
             long newRightNodeNumberOfElements = numberOfElementsOnTwoNodes / 2;
             long newLeftNodeNumberOfElements = numberOfElementsOnTwoNodes - newRightNodeNumberOfElements;
@@ -335,6 +387,51 @@ namespace BTree
             return (parentNodeNewKey, parentNodeNewMainFileAddress);
         }
 
+        internal void MergeWithSibling(Node siblingNode, long parentKey, long parentMainFileAddress)
+        {
+            Node greaterNode;
+            Node smallerNode;
+            if (siblingNode.GetKey(0) > this.GetKey(0))
+            {
+                greaterNode = siblingNode;
+                smallerNode = this;
+            }
+            else
+            {
+                greaterNode = this;
+                smallerNode = siblingNode;
+            }
 
+            //We make space in right node for elements from left node
+            Array.Copy(greaterNode.nodeBytes, 2 * sizeof(long), greaterNode.nodeBytes, 2 * sizeof(long) + (smallerNode.NumberOfElements + 1) * 3 * sizeof(long), greaterNode.NumberOfElements * 3 * sizeof(long) + sizeof(long));
+
+            //We insert parent element
+            greaterNode.SetKey((int)smallerNode.NumberOfElements, parentKey);
+            greaterNode.SetRecordAddress((int)smallerNode.NumberOfElements, parentMainFileAddress);
+
+            //We move left node intro right
+            Array.Copy(smallerNode.nodeBytes, 2 * sizeof(long), greaterNode.nodeBytes, 2 * sizeof(long), smallerNode.NumberOfElements * 3 * sizeof(long) + sizeof(long));
+
+            greaterNode.NumberOfElements += smallerNode.NumberOfElements + 1;
+        }
+
+        internal bool ReplaceRecord(long nodeKey, long repleacedKey, long repleacedRecordAddress)
+        {
+            int recordIndex = -1;
+            for (int i = 0; i < NumberOfElements; i++)
+            {
+                if (GetKey(i) == nodeKey)
+                {
+                    recordIndex = i;
+                    break;
+                }
+            }
+            if (recordIndex == -1)
+                return false;
+
+            SetKey(recordIndex, repleacedKey);
+            SetRecordAddress(recordIndex, repleacedRecordAddress);
+            return true;
+        }
     }
 }

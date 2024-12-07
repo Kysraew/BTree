@@ -28,6 +28,7 @@ namespace BTree
         private FileSystem _fileSystem;
         private MetaData _metaData;
         private MainFile _mainFile;
+        public string FilePath;
         public const long d = 2;
         private long minRecordsInNode
         {
@@ -42,7 +43,7 @@ namespace BTree
         {
             _mainFile = new MainFile(filePath, creatingMode);
             _fileSystem = new FileSystem(filePath + ".bt", creatingMode);
-
+            FilePath = filePath;
             if (creatingMode == CreatingMode.Create)
             {
                 _metaData = new MetaData();
@@ -100,6 +101,8 @@ namespace BTree
             CastingHelper.CastToArray<MetaData>(_metaData).CopyTo(metaDataPageBytes, 0);
 
             _fileSystem.SavePage(0, metaDataPageBytes);
+            _mainFile.EndTapeConnection();
+            _fileSystem.EndConnection();
         }
 
         private bool LoadPageToNodesBuffer(long pageNumber, long height)
@@ -109,6 +112,18 @@ namespace BTree
                 throw new ArgumentException("Heigh not in the BTree");
             }
 
+            //We check if this page isnt already loaded on other height
+            for (int i = 0; i < _nodesBuffers.Count; i++)
+            {
+                if (_nodesBuffers[i] != null && _nodesBuffers[i].pageNumber == pageNumber && i != height)
+                {
+                    PersistNode(_nodesBuffers[i]);
+                    _nodesBuffers[i] = null;
+                }
+
+            }
+
+            // If page is already loaded on this level we dont have to load anything
             if ( _nodesBuffers[(int)height] != null)
             {
                 if (_nodesBuffers[(int)height].pageNumber == pageNumber)
@@ -118,6 +133,7 @@ namespace BTree
                 PersistNode(_nodesBuffers[(int)height]);
             }
 
+            //We load page to buffers
             _nodesBuffers[(int)height] = new Node(_fileSystem.LoadPage(pageNumber), pageNumber, this);
             
             return true;
@@ -227,38 +243,32 @@ namespace BTree
         {
             LoadPageToNodesBuffer(pageNumber, height);
 
-            Node? AddingNode = _nodesBuffers[(int)height];
-
-            if (AddingNode == null)
-                throw new Exception();
-
-            if (AddingNode.NumberOfElements < maxRecordsInNode)
+            if (_nodesBuffers[(int)height].NumberOfElements < maxRecordsInNode)
             {
-                AddingNode.AddElement(nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
+                _nodesBuffers[(int)height].AddElement(nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
                 return true;
             }
-
 
             //If there is not enought space first we try to compensate 
 
             if (height != 0)
             {
                 // Parent page
-                LoadPageToNodesBuffer(AddingNode.ParentPageNumber, height - 1);
+                LoadPageToNodesBuffer(_nodesBuffers[(int)height].ParentPageNumber, height - 1);
 
                 //First we try to compensate from left side
-
-                long leftSiblingPageNumber = _nodesBuffers[(int)height - 1].GetLeftChildAddressFrom(AddingNode.pageNumber); // 0 is special value when not found
+                long leftSiblingPageNumber = _nodesBuffers[(int)height - 1].GetLeftChildAddressFrom(_nodesBuffers[(int)height].pageNumber); // 0 is special value when not found
                 if (leftSiblingPageNumber != 0)
                 {
                     Node LeftSiblingNode = new Node(_fileSystem.LoadPage(leftSiblingPageNumber), leftSiblingPageNumber, this);
-                    (long leftParentKey, long leftParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetLeftKeyAddressPairToChild(AddingNode.pageNumber);
+                    (long leftParentKey, long leftParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetLeftKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber);
 
                     if (LeftSiblingNode.NumberOfElements < maxRecordsInNode)
                     {
-                        (long newLeftParentKey, long newLeftParentMainFileAddress) = AddingNode.EqualizedElementAddingWithLeftSibling(LeftSiblingNode, leftParentKey, leftParentMainFileAddress, nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
+                        _nodesBuffers[(int)height].AddElement(nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
+                        (long newLeftParentKey, long newLeftParentMainFileAddress) = _nodesBuffers[(int)height].EqualizedWithSibling(LeftSiblingNode, leftParentKey, leftParentMainFileAddress);
 
-                        _nodesBuffers[(int)height - 1].SetLeftKeyAddressPairToChild(AddingNode.pageNumber, newLeftParentKey, newLeftParentMainFileAddress);
+                        _nodesBuffers[(int)height - 1].SetLeftKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber, newLeftParentKey, newLeftParentMainFileAddress);
 
                         PersistNode(LeftSiblingNode);
 
@@ -267,18 +277,18 @@ namespace BTree
                 }
 
                 //If we can't we try to compensate form right
-
-                long rightSiblingPageNumber = _nodesBuffers[(int)height - 1].GetRightChildAddressFrom(AddingNode.pageNumber); // 0 is special value when not found
+                long rightSiblingPageNumber = _nodesBuffers[(int)height - 1].GetRightChildAddressFrom(_nodesBuffers[(int)height].pageNumber); // 0 is special value when not found
                 if (rightSiblingPageNumber != 0)
                 {
                     Node RightSiblingNode = new Node(_fileSystem.LoadPage(rightSiblingPageNumber), rightSiblingPageNumber, this);
-                    (long rightParentKey, long rightParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetRightKeyAddressPairToChild(AddingNode.pageNumber);
+                    (long rightParentKey, long rightParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetRightKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber);
 
                     if (RightSiblingNode.NumberOfElements < maxRecordsInNode)
                     {
-                        (long newRightParentKey, long newRightParentMainFileAddress) = AddingNode.EqualizedElementAddingWithRightSibling(RightSiblingNode, rightParentKey, rightParentMainFileAddress, nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
+                        _nodesBuffers[(int)height].AddElement(nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
+                        (long newRightParentKey, long newRightParentMainFileAddress) = _nodesBuffers[(int)height].EqualizedWithSibling(RightSiblingNode, rightParentKey, rightParentMainFileAddress);
 
-                        _nodesBuffers[(int)height - 1].SetRightKeyAddressPairToChild(AddingNode.pageNumber, newRightParentKey, newRightParentMainFileAddress);
+                        _nodesBuffers[(int)height - 1].SetRightKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber, newRightParentKey, newRightParentMainFileAddress);
 
                         PersistNode(RightSiblingNode);
 
@@ -351,6 +361,27 @@ namespace BTree
             }
         }
 
+        private bool DeleteNode(long pageNumber)
+        {
+            int addressBufferIndex = (int)(((_metaData.numberOfEmptySpaces) * sizeof(long)) % Consts.PageSize);
+
+            if (addressBufferIndex == 0)
+            {
+                _fileSystem.AddPage();
+                _metaData.numberOfPages++;
+            }
+
+            byte[] pageWithFreeAddresses = _fileSystem.LoadPage(_metaData.numberOfPages - 1);
+
+            BitConverter.GetBytes(pageNumber).CopyTo(pageWithFreeAddresses, addressBufferIndex);
+
+            _metaData.numberOfEmptySpaces++;
+            _metaData.areEmptySpaces = true;
+
+            _fileSystem.SavePage(_metaData.numberOfPages - 1, pageWithFreeAddresses);
+            return true;
+        }
+
         public bool DeleteRecord(long key)
         {
             long height = 0;
@@ -377,17 +408,105 @@ namespace BTree
                 }
             }
 
-            DeleteElementFromNode(_nodesBuffers[(int)height].pageNumber, height, key);
+            _mainFile.DeleteRecord(_nodesBuffers[(int)height].GetRecordAddressForKey(key));
+            if (!_nodesBuffers[(int)height].IsLeaf())
+            {
+                (long newPageNumber, long newHeight) = ReplaceWithClosestRight(key, height, nextPageAddress);
+               // pageNumber = newPageNumber;
+                height = newHeight;
+                LoadPageToNodesBuffer(newPageNumber, height);
+
+            }
+            _nodesBuffers[(int)height].DeleteElement(key);
+
+            DeleteElementCleanUp(_nodesBuffers[(int)height].pageNumber, height);
             return true;
         }
 
-        public bool DeleteElementFromNode(long pageNumber, long height, long key)
+        private (long newPageNumber, long newHeight) ReplaceWithClosestRight(long nodeKey, long height, long pageNumber)
+        {
+            long nextPageAddress = pageNumber;
+            long startHeight = height;
+
+            while (true)
+            {
+                LoadPageToNodesBuffer(nextPageAddress, height);
+
+                if (_nodesBuffers[(int)height].IsLeaf())
+                {
+                    break;
+                }
+                else
+                {
+                    nextPageAddress = _nodesBuffers[(int)height].GetIntervalChildAddressWithKey(nodeKey);
+                    height++;
+                }
+            }
+
+            long repleacedKey = _nodesBuffers[(int)height].GetKey(0);
+            long repleacedRecordAddress = _nodesBuffers[(int)height].GetRecordAddress(0);
+
+            _nodesBuffers[(int)height].ReplaceRecord(repleacedKey, nodeKey, _nodesBuffers[(int)startHeight].GetMainFileAddressByKey(nodeKey));
+
+            _nodesBuffers[(int)startHeight].ReplaceRecord(nodeKey, repleacedKey, repleacedRecordAddress);
+
+            return (nextPageAddress, height);
+        }
+        private bool MergeNode(long pageNumber, long height)
+        {
+            LoadPageToNodesBuffer(pageNumber, height);
+            LoadPageToNodesBuffer(_nodesBuffers[(int)height].ParentPageNumber, height - 1);
+
+            long leftSiblingPageNumber = _nodesBuffers[(int)height - 1].GetLeftChildAddressFrom(_nodesBuffers[(int)height].pageNumber); // 0 is special value when not found
+            Node LeftSiblingNode = new Node(_fileSystem.LoadPage(leftSiblingPageNumber), leftSiblingPageNumber, this);
+
+            if (LeftSiblingNode.NumberOfElements == minRecordsInNode)
+            {
+                (long leftParentKey, long leftParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetLeftKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber);
+
+                _nodesBuffers[(int)height].MergeWithSibling(LeftSiblingNode, leftParentKey, leftParentMainFileAddress);
+
+                DeleteNode(LeftSiblingNode.pageNumber);
+
+                _nodesBuffers[(int)height - 1].DeleteElement(leftParentKey);
+
+                //PersistNode(_nodesBuffers[(int)height]);
+            }
+            else
+            {
+                long rightSiblingPageNumber = _nodesBuffers[(int)height - 1].GetLeftChildAddressFrom(_nodesBuffers[(int)height].pageNumber); // 0 is special value when not found
+                Node RightSiblingNode = new Node(_fileSystem.LoadPage(rightSiblingPageNumber), rightSiblingPageNumber, this);
+
+                (long rightParentKey, long rightParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetLeftKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber);
+
+                _nodesBuffers[(int)height].MergeWithSibling(LeftSiblingNode, rightParentKey, rightParentMainFileAddress);
+
+                DeleteNode(_nodesBuffers[(int)height].pageNumber);
+
+                _nodesBuffers[(int)height - 1].DeleteElement(rightParentKey);
+
+            }
+
+            if (height - 1 == 0 && _nodesBuffers[(int)height - 1].NumberOfElements == 0)
+            {
+                _metaData.height--;
+                _metaData.rootNodePage = _nodesBuffers[(int)height - 1].GetChildAddress(0);
+                _nodesBuffers[(int)height - 1].ParentPageNumber = 0;
+                DeleteNode(_nodesBuffers[(int)height - 1].pageNumber);
+            }
+            else if ( height - 1 != 0 &&_nodesBuffers[(int)height - 1].NumberOfElements < minRecordsInNode)
+            {
+                DeleteElementCleanUp(_nodesBuffers[(int)height - 1].pageNumber, height - 1);
+            }
+            return true;
+        }
+        public bool DeleteElementCleanUp(long pageNumber, long height)
         {
             LoadPageToNodesBuffer(pageNumber, height);
 
-            if (_nodesBuffers[(int)height].NumberOfElements > maxRecordsInNode)
+
+            if (_nodesBuffers[(int)height].NumberOfElements >= minRecordsInNode || height == 0)
             {
-                _nodesBuffers[(int)height].DeleteElement(key);
                 return true;
             }
 
@@ -397,18 +516,17 @@ namespace BTree
                 LoadPageToNodesBuffer(_nodesBuffers[(int)height].ParentPageNumber, height - 1);
 
                 //First we try to compensate from left side
-
                 long leftSiblingPageNumber = _nodesBuffers[(int)height - 1].GetLeftChildAddressFrom(_nodesBuffers[(int)height].pageNumber); // 0 is special value when not found
                 if (leftSiblingPageNumber != 0)
                 {
                     Node LeftSiblingNode = new Node(_fileSystem.LoadPage(leftSiblingPageNumber), leftSiblingPageNumber, this);
-                    (long leftParentKey, long leftParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetLeftKeyAddressPairToChild(AddingNode.pageNumber);
+                    (long leftParentKey, long leftParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetLeftKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber);
 
-                    if (LeftSiblingNode.NumberOfElements > maxRecordsInNode)
+                    if (LeftSiblingNode.NumberOfElements > minRecordsInNode)
                     {
-                        (long newLeftParentKey, long newLeftParentMainFileAddress) = AddingNode.EqualizedElementAddingWithLeftSibling(LeftSiblingNode, leftParentKey, leftParentMainFileAddress, nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
+                        (long newLeftParentKey, long newLeftParentMainFileAddress) = _nodesBuffers[(int)height].EqualizedWithSibling(LeftSiblingNode, leftParentKey, leftParentMainFileAddress);
 
-                        _nodesBuffers[(int)height - 1].SetLeftKeyAddressPairToChild(AddingNode.pageNumber, newLeftParentKey, newLeftParentMainFileAddress);
+                        _nodesBuffers[(int)height - 1].SetLeftKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber, newLeftParentKey, newLeftParentMainFileAddress);
 
                         PersistNode(LeftSiblingNode);
 
@@ -417,18 +535,17 @@ namespace BTree
                 }
 
                 //If we can't we try to compensate form right
-
-                long rightSiblingPageNumber = _nodesBuffers[(int)height - 1].GetRightChildAddressFrom(AddingNode.pageNumber); // 0 is special value when not found
+                long rightSiblingPageNumber = _nodesBuffers[(int)height - 1].GetRightChildAddressFrom(_nodesBuffers[(int)height].pageNumber); // 0 is special value when not found
                 if (rightSiblingPageNumber != 0)
                 {
                     Node RightSiblingNode = new Node(_fileSystem.LoadPage(rightSiblingPageNumber), rightSiblingPageNumber, this);
-                    (long rightParentKey, long rightParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetRightKeyAddressPairToChild(AddingNode.pageNumber);
+                    (long rightParentKey, long rightParentMainFileAddress) = _nodesBuffers[(int)height - 1].GetRightKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber);
 
-                    if (RightSiblingNode.NumberOfElements < maxRecordsInNode)
+                    if (RightSiblingNode.NumberOfElements > minRecordsInNode)
                     {
-                        (long newRightParentKey, long newRightParentMainFileAddress) = AddingNode.EqualizedElementAddingWithRightSibling(RightSiblingNode, rightParentKey, rightParentMainFileAddress, nodeKey, nodeMainFileAddress, newRightSplittedNodePageNumber);
+                        (long newRightParentKey, long newRightParentMainFileAddress) = _nodesBuffers[(int)height].EqualizedWithSibling(RightSiblingNode, rightParentKey, rightParentMainFileAddress);
 
-                        _nodesBuffers[(int)height - 1].SetRightKeyAddressPairToChild(AddingNode.pageNumber, newRightParentKey, newRightParentMainFileAddress);
+                        _nodesBuffers[(int)height - 1].SetRightKeyAddressPairToChild(_nodesBuffers[(int)height].pageNumber, newRightParentKey, newRightParentMainFileAddress);
 
                         PersistNode(RightSiblingNode);
 
@@ -436,7 +553,8 @@ namespace BTree
                     }
                 }
             }
-            return SplitNode(pageNumber, nodeKey, nodeMainFileAddress, height, newRightSplittedNodePageNumber);
+
+            return MergeNode(pageNumber, height);
         }
 
         public void PrintAllRecords()
